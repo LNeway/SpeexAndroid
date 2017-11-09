@@ -16,6 +16,8 @@
 #define BUFFERSAMPLES 1024
 #define MIN(x, y) ((x)<(y)?(x):(y))
 
+#define NULLPTR 0
+
 using namespace std;
 
 static std::ifstream::pos_type filesize(const char* filename)
@@ -69,11 +71,14 @@ Java_com_devtom_speexandroid_SpeexAndroid_createInstance(JNIEnv *env, jclass typ
                                                         jint inSampleRate, jint outSampleRate,
                                                         jint quality) {
 
-    SpeexResamplerState* instance = speex_resampler_init(channelCount, inSampleRate, outSampleRate,
-                                                         quality, 0);
+    int err = 0;
+    static SpeexResamplerState* instance = speex_resampler_init(channelCount, inSampleRate, outSampleRate,
+                                                         quality, &err);
 
-
-   return 0;
+    if (instance == NULLPTR || err == RESAMPLER_ERR_ALLOC_FAILED) {
+        return -1;
+    }
+    return (jlong) instance;
 }
 
 extern "C"
@@ -89,4 +94,33 @@ Java_com_devtom_speexandroid_SpeexAndroid_resample(JNIEnv *env, jclass type, jst
 
     env->ReleaseStringUTFChars(input_, input);
     env->ReleaseStringUTFChars(output_, output);
+}
+
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_devtom_speexandroid_SpeexAndroid_resampleSample(JNIEnv *env, jclass type, jlong ptr,
+                                                   jshortArray pcm, jint size, jbyteArray out) {
+
+    SpeexResamplerState* st = (SpeexResamplerState*) ptr;
+    short outputBuf[BUFFERSAMPLES];
+    const char * fileName = "/sdcard/testpcm.pcm";
+    if (size == BUFFERSAMPLES) {
+        spx_uint32_t inlen = size;
+        spx_uint32_t outlen = BUFFERSAMPLES;
+        int ret = speex_resampler_process_int(st, 0, (const spx_int16_t *) pcm, &inlen, outputBuf, &outlen);
+        if (ret == RESAMPLER_ERR_SUCCESS) {
+            FILE* outFile;
+            outFile = fopen(fileName, "a+");
+            fwrite(outputBuf, sizeof(short), outlen, outFile);
+            fclose(outFile);
+            LOGE("write %d bytes to file", outlen);
+        }
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_devtom_speexandroid_SpeexAndroid_release(JNIEnv *env, jclass type, jlong ptr) {
+    speex_resampler_destroy((SpeexResamplerState*) ptr);
 }
