@@ -8,13 +8,12 @@
 #include <stdint.h>
 #include "cmath"
 #include <android/log.h>
-#include <string.h>
 #include <fstream>
 
 #define LOGV(...)   __android_log_print((int)ANDROID_LOG_INFO, "SOUNDTOUCH", __VA_ARGS__)
 #define LOGE(...)   __android_log_print((int)ANDROID_LOG_ERROR, "SOUNDTOUCH", __VA_ARGS__)
 
-#define BUFFERSAMPLES 256
+#define BUFFERSAMPLES 1024
 #define MIN(x, y) ((x)<(y)?(x):(y))
 
 using namespace std;
@@ -25,48 +24,36 @@ static std::ifstream::pos_type filesize(const char* filename)
     return in.tellg();
 }
 
-int speexresample(const char *infile, const char *outfile, const int outrate, const int quality)
+int speexresample(const char *infile, const char *outfile, const int channelCount, const int inputRate, const int outrate, const int quality)
 {
     LOGE("infile: %s outfile: %s", infile, outfile);
 
     int resampler_err = 0;
-    SpeexResamplerState* resampler_state = speex_resampler_init(2, 44100, outrate, quality, &resampler_err);
+    SpeexResamplerState* resampler_state = speex_resampler_init(channelCount, inputRate, outrate, quality, &resampler_err);
 
+    FILE* file;
+    FILE* outFile;
+    file = fopen(infile, "r");
+    outFile = fopen(outfile, "w");
 
-    int inputSamples = filesize(infile) / 4;  //one sample = 16bit * 2 channel = 4byte.
-    LOGV("file length is  %d", inputSamples);
-    const int expected_samples_written = (double) inputSamples * ((double)outrate/44100);
-    int total_samples_written = 0;
-    ifstream inStream;
-    inStream.open(infile, ios::binary);
-    if (!inStream.is_open()) {
-        return 0;
-    }
-
-    ofstream outStream(outfile, ios::out);
-
-    char buffer[BUFFERSAMPLES * 4];
-    float outBuffer [BUFFERSAMPLES];
-
-    while(!inStream.eof()) {
-
-        inStream.read(buffer, BUFFERSAMPLES * sizeof(float));
-        unsigned int readSize = inStream.gcount() / 4;
-        LOGE("read %d samples", readSize);
-        unsigned int out_processed = BUFFERSAMPLES;
-        speex_resampler_process_interleaved_float(resampler_state,
-                                                  (float *) buffer,
-                                                  &readSize,
-                                                  outBuffer,
-                                                  &out_processed);
-        LOGE("write %d samples", out_processed);
-        outStream.write((char *) outBuffer, out_processed * 4);
-    }
+    char buf[BUFFERSAMPLES * 2];
+    short out[BUFFERSAMPLES];
+    spx_uint32_t readlen = 0;
+    do {
+        readlen = fread(buf, sizeof(short), BUFFERSAMPLES, file);
+        if (readlen > 0) {
+            spx_uint32_t inlen = readlen;
+            spx_uint32_t outlen = BUFFERSAMPLES;
+            int ret = speex_resampler_process_int(resampler_state, 0, (const spx_int16_t *) buf, &inlen, out, &outlen);
+            if (ret == RESAMPLER_ERR_SUCCESS) {
+                fwrite(out, sizeof(short), outlen, outFile);
+            }
+        }
+    } while (readlen == BUFFERSAMPLES);
 
     speex_resampler_destroy(resampler_state);
-
-    LOGE("read %d samples, wrote %d samples\n", inputSamples, total_samples_written);
-
+    fclose(outFile);
+    LOGE("convert finish....");
     return 0;
 }
 
@@ -98,7 +85,7 @@ Java_com_devtom_speexandroid_SpeexAndroid_resample(JNIEnv *env, jclass type, jst
     const char *input = env->GetStringUTFChars(input_, 0);
     const char *output = env->GetStringUTFChars(output_, 0);
 
-    speexresample(input, output, 32000, 10);
+    speexresample(input, output, channelCount , inSampleRate , outSampleRate, quality);
 
     env->ReleaseStringUTFChars(input_, input);
     env->ReleaseStringUTFChars(output_, output);
