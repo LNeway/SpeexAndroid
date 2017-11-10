@@ -112,18 +112,24 @@ Java_com_devtom_speexandroid_SpeexAndroid_resampleSample(JNIEnv *env, jclass typ
     SpeexResamplerState* st = (SpeexResamplerState*) ptr;
     short outputBuf[BUFFERSAMPLES];
     const char * fileName = "/sdcard/testpcm.pcm";
-    if (size == BUFFERSAMPLES) {
-        spx_uint32_t inlen = size;
-        spx_uint32_t outlen = BUFFERSAMPLES;
+    spx_uint32_t inlen = size;
+    spx_uint32_t outlen = BUFFERSAMPLES;
+    int totalProcess = 0;
+    FILE* outFile;
+    outFile = fopen(fileName, "a+");
+
+    while (totalProcess < size) {
         int ret = speex_resampler_process_int(st, 0, (const spx_int16_t*) audioData, &inlen, outputBuf, &outlen);
         if (ret == RESAMPLER_ERR_SUCCESS) {
-            FILE* outFile;
-            outFile = fopen(fileName, "a+");
             fwrite(outputBuf, sizeof(short), outlen, outFile);
-            fclose(outFile);
             LOGE("write %d bytes to file", outlen);
+        } else {
+            break;
         }
+        totalProcess += inlen;
     }
+
+    fclose(outFile);
 }
 
 extern "C"
