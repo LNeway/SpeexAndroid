@@ -50,17 +50,6 @@ public class MainActivity extends AppCompatActivity {
     private AudioRecordThread recordThread;
 
     public void start(View view) {
-        File file = new File(Environment.getExternalStorageDirectory() + "/testpcm.pcm");
-        if (file.exists()) {
-            file.delete();
-        }
-
-        try {
-            file.createNewFile();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
         if (!hasStart) {
             prepareAudio();
             audioRecord.startRecording();
@@ -76,6 +65,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    private static final int SAMPLE_RATE = 44100;
+
     private static final int[] AUDIO_SOURCES = new int[]{
             MediaRecorder.AudioSource.MIC,
             MediaRecorder.AudioSource.DEFAULT,
@@ -87,17 +78,17 @@ public class MainActivity extends AppCompatActivity {
     private boolean prepareAudio() {
         audioBuffer = new short[1024];
         final int minBufferSize = AudioRecord.getMinBufferSize(
-                44100, AudioFormat.CHANNEL_IN_STEREO,
+                SAMPLE_RATE, AudioFormat.CHANNEL_IN_STEREO,
                 AudioFormat.ENCODING_PCM_16BIT);
 
         for (int source : AUDIO_SOURCES) {
-            audioRecord = new AudioRecord(source, 44100,
+            audioRecord = new AudioRecord(source, SAMPLE_RATE,
                     AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT, minBufferSize * 5);
             if (AudioRecord.STATE_INITIALIZED == audioRecord.getState()) {
                 break;
             }
         }
-        speexAndroid = new SpeexAndroid(2, 44100, 32000,  10);
+        speexAndroid = new SpeexAndroid(2, SAMPLE_RATE, 32000,  10);
         return true;
     }
 

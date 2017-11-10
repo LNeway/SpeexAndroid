@@ -102,13 +102,20 @@ JNIEXPORT void JNICALL
 Java_com_devtom_speexandroid_SpeexAndroid_resampleSample(JNIEnv *env, jclass type, jlong ptr,
                                                    jshortArray pcm, jint size, jbyteArray out) {
 
+    short *audioData = (short *) env->GetShortArrayElements(pcm, 0);
+//    const char * fileName = "/sdcard/testpcm.pcm";
+//    FILE* outFile;
+//    outFile = fopen(fileName, "a+");
+//    fwrite(audioData, sizeof(short), size, outFile);
+//    fclose(outFile);
+
     SpeexResamplerState* st = (SpeexResamplerState*) ptr;
     short outputBuf[BUFFERSAMPLES];
     const char * fileName = "/sdcard/testpcm.pcm";
     if (size == BUFFERSAMPLES) {
         spx_uint32_t inlen = size;
         spx_uint32_t outlen = BUFFERSAMPLES;
-        int ret = speex_resampler_process_int(st, 0, (const spx_int16_t *) pcm, &inlen, outputBuf, &outlen);
+        int ret = speex_resampler_process_int(st, 0, (const spx_int16_t*) audioData, &inlen, outputBuf, &outlen);
         if (ret == RESAMPLER_ERR_SUCCESS) {
             FILE* outFile;
             outFile = fopen(fileName, "a+");
